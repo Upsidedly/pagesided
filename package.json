@@ -1,12 +1,16 @@
 {
   "name": "pagesided",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pagination functions for discord.js v13",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["pagination", "discord.js", "v13"],
+  "keywords": [
+    "pagination",
+    "discord.js",
+    "v13"
+  ],
   "author": "upsided",
   "license": "GPL-3.0-or-later",
   "dependencies": {
