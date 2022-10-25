@@ -49,7 +49,7 @@ function editButtons(index: number, max: number, buttons: MessageButton[]) {
     });
 }
 
-export async function createPaginator(interaction: Interaction, data: PaginationData, optionsRaw: PaginationOptions) {
+export async function createPaginator(interaction: Interaction, data: PaginationData, options?: PaginationOptions) {
     if (!interaction.isRepliable()) throw new Error('Interaction has to be repliable!');
 
     const defaults: PaginationOptions = {
@@ -58,7 +58,7 @@ export async function createPaginator(interaction: Interaction, data: Pagination
         quickTravel: true,
         filter: (inter) => inter.user.id === interaction.user.id,
     };
-    const options = Object.assign({}, defaults, optionsRaw) as Concrete<PaginationOptions>;
+    const config = Object.assign({}, defaults, options ?? {}) as Concrete<PaginationOptions>;
 
     let index = 0;
 
@@ -72,7 +72,7 @@ export async function createPaginator(interaction: Interaction, data: Pagination
             .setDisabled(index === data.length - 1),
     ];
 
-    if (options.quickTravel) {
+    if (config.quickTravel) {
         // Far-left
         buttons.unshift(
             new MessageButton()
@@ -95,8 +95,8 @@ export async function createPaginator(interaction: Interaction, data: Pagination
 
     let message: Message;
 
-    if (options.alreadyReplied.value) {
-        message = options.alreadyReplied.message;
+    if (config.alreadyReplied.value) {
+        message = config.alreadyReplied.message;
         await interaction.editReply({
             content: data[index].content,
             embeds: data[index].embeds,
@@ -118,8 +118,8 @@ export async function createPaginator(interaction: Interaction, data: Pagination
     }
 
     const collector = message.createMessageComponentCollector({
-        time: options.timeout,
-        filter: (b) => options.filter(b) && b.isButton(),
+        time: config.timeout,
+        filter: (b) => config.filter(b) && b.isButton(),
     });
 
     collector.on('collect', async (button) => {
