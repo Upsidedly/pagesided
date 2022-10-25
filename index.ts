@@ -45,6 +45,7 @@ function editButtons(index: number, max: number, buttons: MessageButton[]) {
     return buttons.map((button) => {
         if (['left, farleft'].includes(button.customId!) && index === 0) return button.setDisabled();
         if (['right', 'farright'].includes(button.customId!) && index === max) return button.setDisabled();
+        if (button.customId! === 'pages') return button.setLabel(`${index + 1}/${max + 1}`)
         return button;
     });
 }
