@@ -13,9 +13,9 @@ import {
 export type PaginationData = Array<
     (
         | {
-            /**
-             * Message content
-             */
+              /**
+               * Message content
+               */
               content: string;
               /**
                * Embeds of the message
@@ -23,9 +23,9 @@ export type PaginationData = Array<
               embeds?: MessageEmbed[];
           }
         | {
-            /**
-             * Embeds of the message
-             */
+              /**
+               * Embeds of the message
+               */
               embeds: MessageEmbed[];
               /**
                * Message content
@@ -72,17 +72,23 @@ export interface PaginationOptions {
      * @default "This isn't yours"
      */
     notYoursMessage?: string;
+    /**
+     * If the interaction has already replied to, if the pagination message should be a follow up instead of an edit.
+     */
+    followUp?: boolean;
+    /**
+     * If there should be a "not yours" message (button filter failed message)
+     */
+    notYours?: boolean;
 }
 
-type Concrete<Type> = {
-    [Property in keyof Type]-?: Type[Property];
-};
+type Concrete<Type> = { [Property in keyof Type]-?: Type[Property] };
 
 function editButtons(index: number, max: number, buttons: MessageButton[]) {
     return buttons.map((button) => {
         if (['left, farleft'].includes(button.customId!) && index === 0) return button.setDisabled();
         if (['right', 'farright'].includes(button.customId!) && index === max) return button.setDisabled();
-        if (button.customId! === 'pages') return button.setLabel(`${index + 1}/${max + 1}`)
+        if (button.customId! === 'pages') return button.setLabel(`${index + 1}/${max + 1}`);
         return button.setDisabled(false);
     });
 }
@@ -101,7 +107,9 @@ export async function createPaginator(interaction: Interaction, data: Pagination
         timeout: 1000 * 60 * 15,
         quickTravel: true,
         filter: (inter) => inter.user.id === interaction.user.id,
-        notYoursMessage: 'This isn\'t yours.'
+        notYoursMessage: "This isn't yours.",
+        followUp: false,
+        notYours: true,
     };
     const config = Object.assign({}, defaults, options ?? {}) as Concrete<PaginationOptions>;
 
@@ -138,24 +146,28 @@ export async function createPaginator(interaction: Interaction, data: Pagination
         );
     }
 
+    function getReplyData() {
+        return {
+            content: data[index].content,
+            embeds: data[index].embeds,
+            files: data[index].files,
+            components: [new MessageActionRow().addComponents(buttons)],
+        };
+    }
+
     let message: Message;
 
     if (config.alreadyReplied.value) {
-        message = config.alreadyReplied.message;
-        await interaction.editReply({
-            content: data[index].content,
-            embeds: data[index].embeds,
-            files: data[index].files,
-            components: [new MessageActionRow().addComponents(buttons)],
-        });
+        if (config.followUp === false) {
+            message = config.alreadyReplied.message;
+            await interaction.editReply(getReplyData());
+        } else {
+            const raw = await interaction.followUp({ ...getReplyData(), fetchReply: true });
+            if (!(raw instanceof Message)) throw new Error('Message is not cached!');
+            message = raw;
+        }
     } else {
-        const raw = await interaction.reply({
-            content: data[index].content,
-            embeds: data[index].embeds,
-            files: data[index].files,
-            components: [new MessageActionRow().addComponents(buttons)],
-            fetchReply: true,
-        });
+        const raw = interaction.reply({ ...getReplyData(), fetchReply: true });
 
         if (raw instanceof Message) {
             message = raw;
@@ -165,44 +177,37 @@ export async function createPaginator(interaction: Interaction, data: Pagination
     const collector = message.createMessageComponentCollector({
         time: config.timeout,
         filter: (b) => {
-            const valid = config.filter(b) && b.isButton()
-            if (!valid) b.reply({ content: config.notYoursMessage, ephemeral: true });
-            return valid
+            const valid = config.filter(b) && b.isButton();
+            if (!valid && config.notYours) b.reply({ content: config.notYoursMessage, ephemeral: true });
+            return valid;
         },
     });
 
-    collector.on('collect', async (button) => {
-        switch (button.customId) {
-            case 'left': 
-                index--;
-                break;
+    collector
+        .on('collect', async (button) => {
+            switch (button.customId) {
+                case 'left':
+                    index--;
+                    break;
 
-            case 'right': 
-                index++;
-                break;
+                case 'right':
+                    index++;
+                    break;
 
-            case 'farleft': 
-                index = 0;
-                break;
+                case 'farleft':
+                    index = 0;
+                    break;
 
-            case 'farright':
-                index = data.length - 1;
-                break;
-        }
+                case 'farright':
+                    index = data.length - 1;
+                    break;
+            }
 
-        await button.update({
-            content: data[index].content,
-            embeds: data[index].embeds,
-            files: data[index].files,
-            components: [new MessageActionRow().addComponents(editButtons(index, data.length - 1, buttons))],
+            await button.update(getReplyData());
+        })
+        .on('end', () => {
+            message.edit({
+                components: [new MessageActionRow().addComponents(editButtons(index, data.length - 1, buttons).map((b) => b.setDisabled()))],
+            });
         });
-    }).on('end', () => {
-        message.edit({ 
-            components: [
-                new MessageActionRow().addComponents(
-                    editButtons(index, data.length - 1, buttons).map(b => b.setDisabled())
-                )
-            ]
-        });
-    });
 }
